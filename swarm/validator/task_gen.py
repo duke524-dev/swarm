@@ -195,3 +195,45 @@ def random_task(sim_dt: float, seed: Optional[int] = None) -> MapTask:
         challenge_type=chosen_type,
         version="1",
     )
+
+
+def random_task_with_type(
+    sim_dt: float,
+    seed: Optional[int] = None,
+    challenge_type: Optional[int] = None,
+) -> MapTask:
+    """Like random_task but optionally fix challenge_type (e.g. 4 = open only)."""
+    if seed is None:
+        seed = random.randrange(2**32)
+    rng = random.Random(seed)
+
+    if challenge_type is not None:
+        chosen_type = challenge_type
+    else:
+        challenge_types = list(CHALLENGE_TYPE_DISTRIBUTION.keys())
+        probabilities = list(CHALLENGE_TYPE_DISTRIBUTION.values())
+        type_rng = random.Random(seed + 999999)
+        chosen_type = type_rng.choices(challenge_types, weights=probabilities, k=1)[0]
+
+    params = get_type_params(chosen_type)
+
+    if RANDOM_START:
+        start = _random_start(rng, params)
+        goal = _goal_from_start(rng, start, params)
+    else:
+        if START_PLATFORM:
+            start_z = START_PLATFORM_SURFACE_Z + START_PLATFORM_TAKEOFF_BUFFER
+        else:
+            start_z = 1.5
+        start = (0.0, 0.0, start_z)
+        goal = _goal_from_origin(rng, params)
+
+    return MapTask(
+        map_seed=seed,
+        start=start,
+        goal=goal,
+        sim_dt=sim_dt,
+        horizon=params['horizon'],
+        challenge_type=chosen_type,
+        version="1",
+    )
