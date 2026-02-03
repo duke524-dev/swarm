@@ -36,7 +36,7 @@ def main():
     parser = argparse.ArgumentParser(description="Phase 3: Full mix")
     parser.add_argument("--timesteps", type=int, default=200_000)
     parser.add_argument("--load", type=str, default=DEFAULT_PREVIOUS,
-                        help="Load previous step (Phase 2). Set to '' to train from scratch.")
+                        help="Load previous phase (Phase 2) model to enhance. Set to '' to train from scratch.")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--n-envs", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
@@ -99,7 +99,7 @@ def main():
             model = PPO.load(load_path, env=env, **algo_kw)
         else:
             model = A2C.load(load_path, env=env, **algo_kw)
-        print(f"Loaded: {load_path}")
+        print(f"Loaded previous phase model to enhance: {load_path}")
     else:
         if args.load and args.load != "":
             print(f"Warning: --load {args.load} not found, training from scratch")

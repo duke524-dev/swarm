@@ -25,14 +25,25 @@ from RL.env_wrapper import ResettableTaskWrapper, RewardWrapper
 from RL.rewards import phase1_reward
 from RL.callbacks import EvalLoggingCallbackFromVecEnv
 
+# Default: reuse last Phase 1 model if it exists (load and continue training)
+DEFAULT_PHASE1_MODEL = "swarm/submission_template/phase1_open_only.zip"
+
 
 def make_env_no_gui(task):
     return make_env(task, gui=False)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 1: Open only (no obstacles)")
+    parser = argparse.ArgumentParser(
+        description="Phase 1: Open only (no obstacles). By default reuses existing phase1 model if present; set --load '' to train from scratch."
+    )
     parser.add_argument("--timesteps", type=int, default=100_000)
+    parser.add_argument(
+        "--load",
+        type=str,
+        default=DEFAULT_PHASE1_MODEL,
+        help="Load existing Phase 1 model to reuse and continue training. Set to '' to train from scratch.",
+    )
     parser.add_argument("--seed", type=int, default=None, help="Global RNG seed for reproducibility")
     parser.add_argument("--n-envs", type=int, default=4, help="Number of parallel envs")
     parser.add_argument("--lr", type=float, default=3e-4)
@@ -88,14 +99,20 @@ def main():
     if args.algo == "ppo":
         algo_kw["clip_range"] = args.clip_range
 
-    if args.resume and Path(args.resume).exists():
+    load_path = (
+        args.resume if args.resume and Path(args.resume).exists()
+        else (args.load if args.load and Path(args.load).exists() else None)
+    )
+    if load_path:
         if args.algo == "ppo":
-            model = PPO.load(args.resume, env=env, **algo_kw)
+            model = PPO.load(load_path, env=env, **algo_kw)
         else:
-            model = A2C.load(args.resume, env=env, **algo_kw)
-        print(f"Resumed from {args.resume}")
+            model = A2C.load(load_path, env=env, **algo_kw)
+        print(f"Reusing Phase 1 model to continue training: {load_path}")
     else:
-        if args.resume:
+        if args.load and args.load != "":
+            print(f"Warning: --load {args.load} not found, training from scratch")
+        if args.resume and args.resume != "" and not Path(args.resume).exists():
             print(f"Warning: --resume {args.resume} not found, training from scratch")
         if args.algo == "ppo":
             model = PPO("MultiInputPolicy", env, **algo_kw)

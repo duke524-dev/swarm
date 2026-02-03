@@ -10,9 +10,9 @@ Training is split into **three phases**:
 
 | Phase | Script | Task mix | Default behavior |
 |-------|--------|----------|-------------------|
-| **1** | `RL/train_phase1_open_only.py` | Open only (challenge type 4, no obstacles) | Train from scratch |
-| **2** | `RL/train_phase2_easy_obstacles.py` | Open + easy obstacles (types 4 and 3) | Loads Phase 1 model by default |
-| **3** | `RL/train_phase3_full_mix.py` | All challenge types (same as validator) | Loads Phase 2 model by default |
+| **1** | `RL/train_phase1_open_only.py` | Open only (challenge type 4, no obstacles) | **Reuses last Phase 1 model by default** if it exists; use `--load ''` to train from scratch |
+| **2** | `RL/train_phase2_easy_obstacles.py` | Open + easy obstacles (types 4 and 3) | **Loads Phase 1 model by default** to enhance |
+| **3** | `RL/train_phase3_full_mix.py` | All challenge types (same as validator) | **Loads Phase 2 model by default** to enhance |
 
 Each phase uses a **resettable task wrapper**: every episode gets a **new random task** (new seed), so the policy sees many different scenarios instead of a fixed set.
 
@@ -154,17 +154,17 @@ When using **`--load`** or **`--resume`**, the loaded checkpoint must have been 
 
 ### Phase 1
 
-- **`--resume`**: Resume from a Phase 1 checkpoint (see section 6).
-- No `--load` (always from scratch unless `--resume`).
+- **`--load`** (default: `swarm/submission_template/phase1_open_only.zip`): **Reuse the last Phase 1 model** and continue training. If the file exists, it is loaded; otherwise training starts from scratch. Set to `''` to always train from scratch.
+- **`--resume`**: Resume from a Phase 1 checkpoint (e.g. from `--checkpoint-dir`); takes precedence over `--load` if the file exists.
 
 ### Phase 2
 
-- **`--load`** (default: `swarm/submission_template/phase1_open_only.zip`): Load the Phase 1 model before training. Set to `''` to train from scratch.
+- **`--load`** (default: `swarm/submission_template/phase1_open_only.zip`): **Load the previous phase (Phase 1) model to enhance.** Set to `''` to train from scratch.
 - **`--resume`**: Resume from a Phase 2 checkpoint (takes precedence over `--load` if the file exists).
 
 ### Phase 3
 
-- **`--load`** (default: `swarm/submission_template/phase2_easy_obstacles.zip`): Load the Phase 2 model before training. Set to `''` to train from scratch.
+- **`--load`** (default: `swarm/submission_template/phase2_easy_obstacles.zip`): **Load the previous phase (Phase 2) model to enhance.** Set to `''` to train from scratch.
 - **`--resume`**: Resume from a Phase 3 checkpoint.
 - **`--output`** (default: `phase3_full_mix.zip`): Output filename under `swarm/submission_template/`. Use e.g. `ppo_policy.zip` if you want the same name as the submission template.
 
@@ -176,6 +176,7 @@ When using **`--load`** or **`--resume`**, the loaded checkpoint must have been 
 python RL/train_phase1_open_only.py [OPTIONS]
 
   --timesteps          Total training steps (default: 100000)
+  --load               Reuse Phase 1 model path (default: swarm/.../phase1_open_only.zip). Set to '' for from-scratch.
   --seed               Global RNG seed (optional)
   --n-envs             Number of parallel envs (default: 4)
   --lr                 Learning rate (default: 3e-4)
