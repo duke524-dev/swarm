@@ -14,7 +14,7 @@ from gym_pybullet_drones.utils.enums import (
 # ── project‑level utilities ────────────────────────────────────────────────
 from swarm.validator.reward import flight_reward
 from swarm.constants import (
-    DRONE_HULL_RADIUS, MAX_RAY_DISTANCE,
+    DRONE_HULL_RADIUS, INITIAL_DRONE_SPEED, MAX_RAY_DISTANCE,
     DEPTH_NEAR, DEPTH_FAR, DEPTH_MIN_M, DEPTH_MAX_M,
     SEARCH_AREA_NOISE_XY, SEARCH_AREA_NOISE_Z,
     CAMERA_FOV_BASE, CAMERA_FOV_VARIANCE,
@@ -531,6 +531,24 @@ class MovingDroneAviary(BaseRLAviary):
             physicsClientId=cli,
         )
 
+        # Optional: set initial linear velocity toward goal. With VEL control, the first step()
+        # applies the policy's action and overwrites this velocity, so it only affects the first instant.
+        if INITIAL_DRONE_SPEED > 0:
+            goal_xyz = np.asarray(self.task.goal, dtype=float)
+            delta = goal_xyz - start_xyz
+            dist = float(np.linalg.norm(delta))
+            if dist > 1e-6:
+                direction = delta / dist
+                initial_vel = (INITIAL_DRONE_SPEED * direction).tolist()
+            else:
+                initial_vel = [0.0, 0.0, 0.0]
+            p.resetBaseVelocity(
+                self.DRONE_IDS[0],
+                linearVelocity=initial_vel,
+                angularVelocity=[0.0, 0.0, 0.0],
+                physicsClientId=cli,
+            )
+
     # -------- reward ----------------------------------------------------- #
     def _computeReward(self) -> float:
         """Compute incremental reward based on current state."""
@@ -570,13 +588,18 @@ class MovingDroneAviary(BaseRLAviary):
     # -------- extra logging --------------------------------------------- #
     def _computeInfo(self):
         state = self._getDroneStateVector(0)
-        dist  = float(np.linalg.norm(state[0:3] - self.GOAL_POS))
+        pos = np.asarray(state[0:3], dtype=np.float64)
+        vel = np.asarray(state[10:13], dtype=np.float64)  # linear velocity
+        dist = float(np.linalg.norm(pos - self.GOAL_POS))
         return {
             "distance_to_goal": dist,
             "score"           : self._prev_score,
             "success"         : self._success,
             "collision"       : self._collision,
             "t_to_goal"       : self._t_to_goal,
+            "drone_position"  : pos.copy(),
+            "drone_velocity"  : vel.copy(),
+            "goal_position"   : np.asarray(self.GOAL_POS, dtype=np.float64).copy(),
         }
 
     # -------- observation extension -------------------------------------- #

@@ -12,7 +12,7 @@ from swarm.core.drone import track_drone
 from swarm.protocol import ValidationResult
 from swarm.utils.env_factory import make_env
 from swarm.validator.reward import flight_reward
-from swarm.validator.task_gen import random_task
+from swarm.validator.task_gen import random_task, random_task_with_type
 from gym_pybullet_drones.utils.enums import ActionType
 
 
@@ -81,11 +81,11 @@ def _run_episode_speed_limit(task, uid, model, *, gui=False):
     score = flight_reward(success=success, t=t_sim, horizon=task.horizon, task=task)
     avg_speed = np.mean(speeds) if speeds else 0.0
     result = ValidationResult(uid, success, t_sim, score)
-    return result, avg_speed
+    return result, avg_speed, speeds
 
 
 def _run_episode(task, uid, model, *, gui=False):
-    result, _ = _run_episode_speed_limit(task, uid, model, gui=gui)
+    result, _, _ = _run_episode_speed_limit(task, uid, model, gui=gui)
     return result
 
 
@@ -98,6 +98,13 @@ def main():
         help="Path to the Stable-Baselines3 .zip file.",
     )
     parser.add_argument("--seed", type=int, default=1, help="Random seed for MapTask generation")
+    parser.add_argument(
+        "--challenge-type",
+        type=int,
+        default=None,
+        choices=[1, 2, 3, 4, 5],
+        help="Fix task type: 1=city, 2=high obstacles, 3=easy, 4=open (no obstacles), 5=moving platform. Omit for mixed (validator distribution).",
+    )
     parser.add_argument("--gui", action="store_true", default=False,
                         help="After evaluation, replay the episode in a PyBullet GUI")
     args = parser.parse_args()
@@ -105,7 +112,12 @@ def main():
     if not args.model.exists():
         raise FileNotFoundError(f"Policy file not found: {args.model}")
 
-    task = random_task(sim_dt=SIM_DT, seed=args.seed)
+    if args.challenge_type is not None:
+        task = random_task_with_type(sim_dt=SIM_DT, seed=args.seed, challenge_type=args.challenge_type)
+        print(f"Task type: {args.challenge_type} (dedicated)")
+    else:
+        task = random_task(sim_dt=SIM_DT, seed=args.seed)
+        print(f"Task type: {task.challenge_type} (mixed)")
 
     print(f"Evaluating policy at {args.model} …")
     _init_env = make_env(task, gui=False)
@@ -117,7 +129,7 @@ def main():
         except Exception:
             pass
 
-    result, avg_speed = _run_episode_speed_limit(
+    result, avg_speed, _ = _run_episode_speed_limit(
         task=task, uid=0, model=model, gui=args.gui
     )
 

@@ -233,6 +233,7 @@ Phase 2 and Phase 3 add **`--load`** and (Phase 3) **`--output`**; other options
 | `RL/env_wrapper.py` | `ResettableTaskWrapper`, `RewardWrapper` |
 | `RL/rewards.py` | Phase-specific reward functions (edit for custom rewards) |
 | `RL/callbacks.py` | Eval callback (success rate, time, reward) and eval helper |
+| `RL/eval_validator_style.py` | Multi-episode evaluation with same tasks & scoring as validator |
 | `docs/training.md` | This document |
 
 Checkpoints and logs are written under `logs/` by default (see `--checkpoint-dir` and `--tensorboard-log`).
@@ -264,3 +265,44 @@ Reward logic is split per phase so you can tune it for more complicated training
 - **Phase 3:** Add a small time penalty per step or a bonus for finishing under target time.
 
 The validator’s **final** score is still `flight_reward` (success + time). Keep your shaping terms small so that “reach goal quickly” remains the main objective.
+
+---
+
+## 15. Testing like the validator (same as real practice)
+
+To see how your trained model would score on the subnet, use the same task generation and scoring as validators.
+
+### Option A: Validator-style multi-episode evaluation (same tasks & scoring)
+
+Use **`RL/eval_validator_style.py`** to run many episodes with the same task distribution and `flight_reward` as the validator, and get success rate and mean score:
+
+```bash
+# Default: 20 episodes, mixed challenge types (same distribution as validator)
+python RL/eval_validator_style.py --model swarm/submission_template/phase1_open_only.zip
+
+# More episodes, reproducible seeds
+python RL/eval_validator_style.py --model path/to/policy.zip -n 50 --seed-start 1000
+```
+
+This uses `random_task(sim_dt=SIM_DT, seed=...)` so challenge types match `CHALLENGE_TYPE_DISTRIBUTION`. No Docker required; it loads the PPO `.zip` directly.
+
+### Option B: Single-episode quick check
+
+Use **`RL/test_RL.py`** for one run with a fixed seed:
+
+```bash
+python RL/test_RL.py --model swarm/submission_template/phase1_open_only.zip --seed 42
+```
+
+### Option C: Exact submission path (RPC agent, like production)
+
+Validators run your **submission ZIP** (RPC agent with `main.py`). To test that same code path locally:
+
+1. Put your policy in `swarm/submission_template` and ensure `drone_agent.py` loads it in `DroneFlightController`.
+2. Run the RPC test (no Docker required for this local test):
+
+   ```bash
+   python tests/test_rpc.py --folder swarm/submission_template --seed 42
+   ```
+
+3. For the **exact** production path (Docker + same evaluator as validators), run the validator locally with Docker; it will build the image and evaluate the same way as on the subnet.

@@ -42,7 +42,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Phase 1: Open only (no obstacles). By default reuses existing phase1 model if present; set --load '' to train from scratch."
     )
-    parser.add_argument("--timesteps", type=int, default=100_000)
+    parser.add_argument("--timesteps", type=int, default=300_000, help="Total training steps (default 300k for better velocity learning)")
     parser.add_argument(
         "--load",
         type=str,
@@ -52,10 +52,10 @@ def main():
     parser.add_argument("--seed", type=int, default=None, help="Global RNG seed for reproducibility")
     parser.add_argument("--n-envs", type=int, default=4, help="Number of parallel envs")
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--n-steps", type=int, default=2048)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--n-steps", type=int, default=4096, help="Steps per env per update (higher = more data, encourages exploration)")
+    parser.add_argument("--batch-size", type=int, default=128, help="Minibatch size (match n_steps * n_envs for full batches)")
     parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--ent-coef", type=float, default=0.01)
+    parser.add_argument("--ent-coef", type=float, default=0.02, help="Entropy coef (slightly higher encourages trying larger actions)")
     parser.add_argument("--clip-range", type=float, default=0.2)
     parser.add_argument("--gae-lambda", type=float, default=0.95)
     parser.add_argument("--device", type=str, default="auto")

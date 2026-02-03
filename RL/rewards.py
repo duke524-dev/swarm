@@ -18,6 +18,19 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
+from swarm.constants import SIM_DT, SPEED_LIMIT
+
+
+# Phase 1 speed shaping: reward for moving toward goal faster, penalty for near-zero movement
+SPEED_TOWARD_GOAL_SCALE = 0.03   # reward per m/s toward goal (e.g. 1 m/s -> +0.03/step)
+LOW_SPEED_THRESHOLD_M = 0.0005   # treat progress below this as "standing still" (meters/step)
+LOW_SPEED_PENALTY = 0.008        # penalty per step when not moving toward goal (encourages throttle)
+# Alignment: bonus when flight direction matches goal direction (smaller angle -> higher bonus)
+ALIGNMENT_BONUS_SCALE = 0.025    # reward per unit cos(angle); 1 = straight toward goal -> +0.025/step
+MIN_SPEED_FOR_ALIGNMENT = 0.05   # only apply alignment bonus when speed > this (m/s), avoid div by zero
+
 
 def phase1_reward(
     prev_info: dict[str, Any],
@@ -33,6 +46,9 @@ def phase1_reward(
     progress toward the goal and time:
 
     - positive when distance_to_goal decreases (moving closer)
+    - bonus for speed toward goal (encourages larger velocity commands)
+    - alignment bonus: reward when flight direction matches goal direction (smaller angle -> more bonus)
+    - penalty for very low movement (discourages hovering)
     - small time penalty each step (encourages shorter paths)
     - big bonus on success
     - optional penalty on collision (should be rare in open env)
@@ -45,8 +61,34 @@ def phase1_reward(
     progress = dist_prev - dist_now  # meters closer
 
     # Scale progress so typical per-step reward stays moderate.
-    # You can tune 0.5 up/down based on learning behavior.
     r = 0.5 * progress
+
+    # Alignment bonus: reward when velocity direction points toward goal (angle between goal vec and flight vec small)
+    pos = info.get("drone_position")
+    vel = info.get("drone_velocity")
+    goal_pos = info.get("goal_position")
+    if pos is not None and vel is not None and goal_pos is not None:
+        pos = np.asarray(pos, dtype=np.float64)
+        vel = np.asarray(vel, dtype=np.float64)
+        goal_pos = np.asarray(goal_pos, dtype=np.float64)
+        speed = float(np.linalg.norm(vel))
+        if speed >= MIN_SPEED_FOR_ALIGNMENT:
+            goal_vec = goal_pos - pos
+            dist_to_goal = float(np.linalg.norm(goal_vec))
+            if dist_to_goal > 1e-6:
+                goal_dir = goal_vec / dist_to_goal
+                flight_dir = vel / speed
+                cos_angle = float(np.clip(np.dot(goal_dir, flight_dir), -1.0, 1.0))
+                r += ALIGNMENT_BONUS_SCALE * max(0.0, cos_angle)
+
+    # Speed toward goal (m/s): reward moving faster toward the goal
+    speed_toward_goal = progress / SIM_DT
+    if speed_toward_goal > 0:
+        r += SPEED_TOWARD_GOAL_SCALE * min(speed_toward_goal, SPEED_LIMIT)
+    # Penalty for standing still when not at goal (encourages policy to use throttle)
+    if not info.get("success", False) and not info.get("collision", False):
+        if progress < LOW_SPEED_THRESHOLD_M:
+            r -= LOW_SPEED_PENALTY
 
     # Small time penalty every step to encourage faster arrival.
     r -= 0.001

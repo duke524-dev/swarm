@@ -98,6 +98,10 @@ HOVER_SEC = 0                           # Required hover duration for mission su
 SAFE_Z = 3                              # Default cruise altitude (meters)
 GOAL_TOL = LANDING_PLATFORM_RADIUS * 0.8 * 1.06  # TAO badge radius for precision landing (0.5088m)
 SPEED_LIMIT = 3.0                       # Maximum drone velocity limit (m/s)
+# Initial velocity (m/s) applied at episode reset; direction is toward goal. 0 = start at rest.
+# Note: With ActionType.VEL, the first policy action overwrites this on the very first step, so
+# the episode-average speed will still be dominated by the policy's commands, not this value.
+INITIAL_DRONE_SPEED = 0.0               # Set > 0 only for debugging; does not persist after first action
 MAX_YAW_RATE = 3.141                    # Maximum yaw rotation rate (rad/s) - 180 degrees per second
 # Goal generation ranges (legacy defaults)
 SAFE_ZONE_RADIUS = 2.0                  # Minimum clearance around obstacles (meters)
