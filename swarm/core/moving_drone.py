@@ -65,7 +65,10 @@ class MovingDroneAviary(BaseRLAviary):
         """
         self.task       = task
         self.GOAL_POS   = np.asarray(task.goal, dtype=float)
-        self.EP_LEN_SEC = float(task.horizon)
+        self.EP_LEN_SEC = float(
+            task.horizon_override if getattr(task, "horizon_override", None) is not None
+            else task.horizon
+        )
 
         self._time_alive = 0.0
         self._success = False
@@ -375,9 +378,11 @@ class MovingDroneAviary(BaseRLAviary):
     def _add_sensor_noise(self, rgb: np.ndarray, frame_seed: int) -> np.ndarray:
         """Apply realistic sensor noise to RGB image."""
         rng = np.random.RandomState(frame_seed)
-        noise = rng.normal(0, SENSOR_NOISE_STD, rgb.shape)
+        noise_scale = getattr(self.task, "noise_scale", 1.0) or 1.0
+        effective_std = SENSOR_NOISE_STD * noise_scale
+        noise = rng.normal(0, effective_std, rgb.shape)
         rgb = np.clip(rgb.astype(np.float32) + noise, 0, 255)
-        exposure = rng.uniform(SENSOR_EXPOSURE_MIN, SENSOR_EXPOSURE_MAX)
+        exposure = 1.0 + (rng.uniform(SENSOR_EXPOSURE_MIN, SENSOR_EXPOSURE_MAX) - 1.0) * noise_scale
         rgb = np.clip(rgb * exposure, 0, 255)
         return rgb.astype(np.uint8)
 
@@ -437,6 +442,13 @@ class MovingDroneAviary(BaseRLAviary):
         if platform_hit and not self._success:
             self._success = True
             self._t_to_goal = self._time_alive
+        # Curriculum: also count success when within goal_tol_override of goal
+        goal_tol = getattr(self.task, "goal_tol_override", None)
+        if goal_tol is not None and not self._success:
+            pos = self._getDroneStateVector(0)[0:3]
+            if float(np.linalg.norm(pos - self.GOAL_POS)) <= goal_tol:
+                self._success = True
+                self._t_to_goal = self._time_alive
 
         if obstacle_hit:
             self._collision = True

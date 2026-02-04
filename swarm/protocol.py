@@ -34,13 +34,21 @@ class MapTask:
     horizon: float
     challenge_type: int
     version: str = "1"
+    # Optional curriculum/training overrides (None = use defaults)
+    goal_tol_override: Optional[float] = None
+    noise_scale: Optional[float] = None
+    horizon_override: Optional[float] = None
 
     def pack(self) -> bytes:
         return msgpack.packb(asdict(self), use_bin_type=True)
 
     @staticmethod
     def unpack(blob: bytes) -> "MapTask":
-        return MapTask(**msgpack.unpackb(blob, raw=False))
+        import dataclasses
+        data = msgpack.unpackb(blob, raw=False)
+        allowed = {f.name for f in dataclasses.fields(MapTask)}
+        data = {k: v for k, v in data.items() if k in allowed}
+        return MapTask(**data)
 
 
 @dataclass(slots=True)
