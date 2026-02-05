@@ -101,6 +101,7 @@ def main():
     model = SAC(
         "MultiInputPolicy",
         env,
+        buffer_size=50_000,
         verbose=1,
         tensorboard_log=None,
         policy_kwargs=dict(net_arch=dict(pi=[256, 256], qf=[256, 256])),
